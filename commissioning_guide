@@ -1,0 +1,221 @@
+# Commissioning Guide — Trident 300 → MadMax Two-Tool
+
+Scope: mechanical build is done. This covers wiring sanity through
+first T0 print, then the MadMax conversion, T1 bring-up, toolchanger
+tuning, and the first dual-tool print. Companion files: INSTALL.md
+(software/flashing), README.md (config architecture), config/
+(the skeleton configs).
+
+Strategy note, worth internalizing before starting: the printer is
+built with the MadMax core (carriage + plate + clips) and T0 from day
+one — no interim stock carriage. But commission it as a
+SINGLE-TOOL printer first, completely, including a real print: no
+docks installed, no toolchanger software loaded, T1 still in its box
+until Phase 4. Every toolchanger problem you hit later is then a
+toolchanger problem — not a mystery that might be wiring, might be
+config, might be docks. Bonus: the one novel mechanical element, the
+Maxwell coupling, gets proven in isolation during boring single-tool
+printing.
+
+---
+
+## Phase 0 — Pre-power checks (multimeter, PSU off)
+
+MadMax core is part of the initial build: print the core parts
+(carriage, plate, clips) and T0's toolhead plate in ABS/ASA and
+install them during gantry assembly. Do NOT print/install docks, the
+T1 plate, or the Nudge mount yet — those wait for Phase 4. While
+assembling, confirm the MadMax carriage geometry puts the X endstop
+trigger somewhere sane (or adjust the switch mount now — far easier
+during assembly than after).
+
+1. Continuity-check heater circuits: bed SSR wiring, both hotend
+   heater pairs. No continuity from any heater lead to frame ground.
+2. Verify 24V and mains separation at the Leviathan terminals;
+   confirm PSU output voltage unloaded before connecting the board.
+3. Check thermistor resistance at room temp (~100kΩ for the usual
+   NTC 100K/104NT parts) on bed + both toolheads.
+4. Tug-test every crimp. The toolhead umbilicals especially — they
+   will move millions of cycles.
+5. Wire the Maxwell-coupling detect circuit for T0 now, even though
+   toolchanger software comes much later (Phase 5).
+6. Set Z endstop-related hardware aside mentally: there is none.
+   Cartographer is the Z reference; nothing to wire at the bed rear.
+
+## Phase 1 — Software + electronics bring-up (T0 only mounted)
+
+1. Follow INSTALL.md through flashing the Leviathan, ONE Nitehawk
+   (labeled T0), and installing the Cartographer plugin. Leave the
+   second Nitehawk in its box.
+2. Copy the config package in; fill in the three serial paths
+   (leviathan, nhk0, scanner). COMMENT OUT for now:
+   `[include toolhead-T1.cfg]`, `[include toolchanger.cfg]`,
+   `[include toolchanger_macros.cfg]`, `[include
+   homing_toolchanger.cfg]`, `[include nudge.cfg]`, plus the
+   toolchanger block at the bottom of toolhead-T0.cfg
+   ([gcode_macro T0] / [tool T0] / [tool_probe T0]). Temporarily
+   rename `[fan_generic part_fan_t0]` to plain `[fan]` so stock
+   M106 drives it. Result: a normal single-tool printer. All of
+   this reverts at Phase 5.
+3. Klipper starts with no errors; all three MCUs connect.
+4. `QUERY_ENDSTOPS` while hand-pressing X, then Y switches:
+   open → TRIGGERED transitions on the right axis.
+5. Thermistors: bed and extruder read plausible room temp.
+6. `SET_HEATER_TEMPERATURE HEATER=heater_bed TARGET=50` — watch it
+   climb, then off. Same brief test for the extruder at 100°C.
+   Confirm the hotend fan spins at 60°C and reports RPM in Mainsail.
+7. `STEPPER_BUZZ STEPPER=stepper_x` (etc. for y, z, z1, z2) —
+   confirm each motor moves and direction conventions look right.
+   Wrong direction: invert the dir_pin with `!`, don't rewire.
+8. Coupling detect check: with toolchanger software not yet loaded,
+   watch the detect pin raw — add a temporary
+   `[gcode_button t0_detect]` on the detect pin with a RESPOND in
+   press/release gcode, or QUERY the pin however convenient. Seat
+   and unseat T0 by hand (motors off): transitions must be clean and
+   instant, every time. This is the Maxwell coupling's health check,
+   done in isolation.
+
+## Phase 2 — Motion, probing, and calibration (still single-tool)
+
+1. Home X, then Y. Verify homing direction and that position_endstop
+   matches physical reality (nozzle at endstop = the coordinate in
+   config). Fix position_max to measured travel.
+2. Cartographer: with XY homed, `CARTOGRAPHER_CALIBRATE` at bed
+   center per its docs (manual paper-Z first run), then `G28 Z`.
+   Run `PROBE_ACCURACY`; expect single-digit-micron range.
+3. `Z_TILT_ADJUST` — should converge in 2-3 rounds. Re-`G28 Z`.
+4. `BED_MESH_CALIBRATE` — sanity-check the mesh shape (no cliffs).
+5. PID tune: `PID_CALIBRATE HEATER=heater_bed TARGET=100`,
+   `PID_CALIBRATE HEATER=extruder TARGET=245`, SAVE_CONFIG.
+6. Extruder rotation_distance calibration: mark 120mm, extrude 100,
+   measure, correct.
+7. Input shaper with the T0 ADXL: `SHAPER_CALIBRATE`. Expect to
+   revisit after MadMax (mass changes).
+8. First layer: `CARTOGRAPHER_TOUCH` z-offset workflow, test square,
+   dial in.
+
+## Phase 3 — First T0 print
+
+A real print: a Voron cube or similar, PLA or ABS as you prefer.
+You are proving: homing, meshing, extrusion, cooling, retraction,
+PRINT_START/PRINT_END macros — and the Maxwell coupling under real
+print loads. Run at least one print at your intended full
+accelerations and inspect layer consistency; coupling micro-movement
+shows up as artifacts here. Slice with a plain single-extruder
+profile at this stage. Do not proceed until this print is boring.
+
+Also record a coupling baseline now: a PROBE_ACCURACY-style
+repeatability number and a photo of a test print. The MadMax docs
+note the lower coupling screws wear over time — a baseline gives you
+something objective to compare against months from now.
+
+Milestone: the machine is a working Trident. Take the config backup
+now (`~/printer_data/config` → git or a dated tarball). This is the
+known-good state you can diff against for everything that follows.
+
+## Phase 4 — MadMax conversion, part 2: docks + T1 hardware
+
+The core is already on the printer; this phase adds everything else.
+
+1. Print TWO docks and the T1 toolhead plate in ABS/ASA, plus the
+   Nudge mount.
+2. Install docks per the repo's INSTRUCTIONS.md; route the second
+   umbilical; mount the Nudge at its chosen rear-bed location (both
+   nozzles must reach it — dry-fit and check against dock keep-out
+   before committing).
+3. Wire the Nudge to its main-board endstop input, and the T1
+   coupling detect circuit.
+4. Re-measure anything dock hardware changed (Y travel near docks);
+   expect to re-run input shaper if head hardware changed mass.
+5. Flash the second Nitehawk (INSTALL.md §3), label everything T1.
+
+## Phase 5 — Config cutover to toolchanger
+
+1. Restore the toolchanger config: uncomment the T1, toolchanger,
+   toolchanger_macros, homing_toolchanger, and nudge includes plus
+   toolhead-T0.cfg's toolchanger block; revert `[fan]` back to
+   `[fan_generic part_fan_t0]`; comment out the simple
+   [homing_override] in macros.cfg (homing_toolchanger.cfg
+   supersedes it); set safe_home_x/y in [gcode_macro
+   homing_variables] to bed center for Cartographer touch. Klipper
+   restarts clean. The dock positions are still -1000 sentinels --
+   any toolchange attempt now fails loudly instead of moving, which
+   is intended until Phase 6 replaces them with measurements.
+3. Verify tool detection before any motion: with T0 seated,
+   the toolchanger status shows tool 0 detected; pop T0 off by hand
+   (printer idle, motors off) and watch detection drop. Same for T1
+   seated by hand.
+4. Re-verify Phase 1 checks for the T1 head: extruder1 thermistor,
+   heater blip, hotend fan + tach, extruder direction, PID tune.
+
+## Phase 6 — Dock calibration (the careful part)
+
+Work with motors at reduced current if nervous, hand on the killswitch,
+and speeds low. Never do this with heaters on.
+
+1. With T0 mounted, jog the carriage until the tool is perfectly
+   seated in its dock keyslot position. `GET_POSITION`. That's
+   params_park_x/y for T0. Repeat for T1's dock (mount T1 by hand
+   for this).
+2. Walk through a dropoff manually: issue the individual moves of
+   the dock path at 300 mm/min and watch clearances. Adjust path
+   params. Then a pickup. Then let the macro do it at
+   params_path_speed ~600.
+3. `T0`, `T1`, `T0` ... individually, watching every change. When
+   confident, `DOCK_SEQUENCE REPS=10`, then REPS=100 at full
+   params_fast_speed. Zero detection faults is the bar — a 99%
+   toolchanger ruins every long print.
+4. Confirm crash detection: with a tool attached and the printer
+   idle-but-homed, gently pull the tool off by hand — the configured
+   crash_gcode should fire immediately.
+
+## Phase 7 — Tool offsets
+
+1. Locate the Nudge: `G28`, `NUDGE_MOVE_OVER_PROBE` coordinates set
+   from jogging T0's nozzle ~1mm above the pin, then
+   `NUDGE_FIND_TOOL_OFFSET`. Verify sane "Sensor location at ..."
+   console output and repeatability (run twice; compare).
+2. Install r2pdx's two .cfg files, extend the variables block for
+   two tools, and run `TC_FIND_ALL_TOOL_OFFSETS`. Offsets land in
+   the save file; T0 stays 0,0,0 by definition.
+3. Verify Z agreement: after offsets, print a one-layer patch with
+   T0 and another with T1 — first-layer squish should match. Fine
+   tune per r2pdx's live-adjust workflow (0.05mm X/Y, 0.01-0.025mm
+   Z increments).
+4. Print an alignment test (two-color calibration cross / offset
+   test STL) and inspect seams under magnification. You have a
+   camera and macro rig; use it — layer-line-level misalignment is
+   easier to judge in a photo.
+
+## Phase 8 — First dual-tool print
+
+1. Slicer: multi-extruder profile (2 extruders, same nozzle size),
+   tool-change gcode = `T[next_extruder]`, PRINT_START line passing
+   BED, T0_TEMP, T1_TEMP (see klipper-toolchanger's example slicer
+   snippets for the is_extruder_used conditionals).
+2. Add `VERIFY_TOOL_DETECTED ASYNC=1` to after-layer-change gcode —
+   cheap insurance that a silently-dropped tool stops the print at
+   the next layer.
+3. First print: a two-color Voron cube or similar small two-material
+   part. Watch the first three toolchanges in person.
+4. Ooze/prime tuning comes last: dock brushes/blockers, prime tower
+   vs purge line, per-tool pressure advance. Expect a few evenings
+   of iteration here; it's normal.
+
+---
+
+## Sequencing rationale / common traps
+
+- MadMax core from day one, but single-tool software first (Phases
+  1-3) — final geometry/mass from the start, coupling proven in
+  isolation, and every later fault is unambiguously a toolchanger
+  fault.
+- Backup at Phase 3 milestone; diff configs afterward, don't rewrite.
+- Detection verification (5.3) before motion means a path bug can't
+  masquerade as a detection bug later.
+- Offsets (Phase 7) only after docks are 100% reliable (Phase 6) —
+  calibrating offsets against inconsistent seating chases ghosts.
+- Re-run input shaper after ANY toolhead mass change, including
+  adding dock hardware to heads.
+- Keep klipper-toolchanger pinned to the commit you commissioned on;
+  update deliberately with the changelog open.
