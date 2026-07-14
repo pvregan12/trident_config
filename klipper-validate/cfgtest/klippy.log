@@ -1,0 +1,13 @@
+Starting Klippy...
+Args: ['../klipper/klippy/klippy.py', 'printer.cfg', '-o', '/dev/null', '-d', '/dev/null', '-l', 'klippy.log']
+Git version: 'f604aee-dirty'
+Untracked files: klippy/extras/*.py, klippy/extras/cartographer.py, klippy/extras/idm.py, klippy/extras/scanner.py
+Branch: master
+Remote: origin
+Tracked URL: https://github.com/Klipper3d/klipper
+CPU: 8 core Intel(R) Core(TM) Ultra 5 226V
+Device: HP OmniBook X Flip Laptop 14-fm0xxx
+Linux: Linux version 6.19.14-300.fc44.x86_64 (mockbuild@39b591681bec4b3c88f57a32ae487612) (gcc (GCC) 16.0.1 20260321 (Red Hat 16.0.1-0), GNU ld version 2.46-1.fc44) #1 SMP PREEMPT_DYNAMIC Thu Apr 23 15:17:50 UTC 2026
+Python: '3.14.6 (main, Jun 11 2026, 00:00:00) [GCC 16.1.1 20260515 (Red Hat 16.1.1-2)]'
+Building C code module c_helper.so
+Unable to build C code module (error=256)
