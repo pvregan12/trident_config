@@ -22,6 +22,12 @@ for arg in "$@"; do case "$arg" in
 esac; done
 
 [[ -d "$CFG_SRC" ]] || { echo "ERROR: config dir '$CFG_SRC' not found"; exit 2; }
+compgen -G "$CFG_SRC/*.cfg" > /dev/null || {
+    echo "ERROR: no .cfg files in '$CFG_SRC'."
+    echo "       If your configs live in the repo root, run:  ./check.sh ."
+    exit 2
+}
+[[ -f "$CFG_SRC/printer.cfg" ]] || { echo "ERROR: '$CFG_SRC' has .cfg files but no printer.cfg"; exit 2; }
 
 # ---------- toolchain (cached) ----------
 if [[ ! -d "$CACHE/klipper" ]]; then
@@ -31,13 +37,17 @@ if [[ ! -d "$CACHE/klipper" ]]; then
     ./venv/bin/pip -q install cffi pyserial greenlet jinja2 markupsafe python-can numpy
     git clone -q --depth 1 https://github.com/Klipper3d/klipper
     git clone -q --depth 1 https://github.com/viesturz/klipper-toolchanger kt
-    git clone -q --depth 1 https://github.com/Cartographer3D/cartographer-klipper carto
     ln -sf "$CACHE"/kt/klipper/extras/*.py klipper/klippy/extras/
-    ln -sf "$CACHE"/carto/{scanner.py,idm.py,cartographer.py} klipper/klippy/extras/
+    # NEW cartographer plugin: python package into the venv, plus the
+    # extras scaffolding link its install.sh would create
+    ./venv/bin/pip -q install "cartographer3d-plugin"
+    CARTO_ENTRY=$(grep -rln "def load_config" venv/lib/python3*/site-packages/cartographer/ | head -1)
+    ln -sf "$CACHE/$CARTO_ENTRY" klipper/klippy/extras/cartographer.py
 fi
 if [[ "${UPDATE:-}" == 1 ]]; then
     echo ">> Updating klipper + plugins"
-    for d in klipper kt carto; do git -C "$CACHE/$d" pull -q; done
+    for d in klipper kt; do git -C "$CACHE/$d" pull -q; done
+    ./venv/bin/pip -q install --upgrade "cartographer3d-plugin"
     # re-link in case plugins added new extras files
     ln -sf "$CACHE"/kt/klipper/extras/*.py "$CACHE"/klipper/klippy/extras/
 fi

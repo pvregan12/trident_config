@@ -107,17 +107,19 @@ one host, save each board's menuconfig (`cp .config
 ~/klipper-configs/<board>.config`) and restore + `make clean && make`
 before flashing each board.
 
-## 4. Cartographer
+## 4. Cartographer (NEW plugin -- Survey 5.0+)
 
-Ships preflashed. Install the host plugin:
+Install the current python-package plugin (the older
+cartographer-klipper repo and its [scanner] section are superseded):
 ```bash
-cd ~
-git clone https://github.com/Cartographer3D/cartographer-klipper
-./cartographer-klipper/install.sh
+curl -s -L https://raw.githubusercontent.com/Cartographer3D/cartographer3d-plugin/refs/heads/main/scripts/install.sh \
+  | bash -s -- --klipper ~/klipper --klippy-env ~/klippy-env
+git clone https://github.com/Cartographer3D/cartographer_firmware.git ~/cartographer_firmware
 ```
-`ls /dev/serial/by-id/` for the Cartographer serial → `[mcu scanner]`.
-Firmware updates later come through the plugin's update script, not
-make menuconfig.
+`ls /dev/serial/by-id/` for the serial → `[mcu cartographer]`. Then
+update the probe firmware to the latest per their docs BEFORE
+calibration (Survey 5.0+ firmware pairs with this plugin; mismatched
+firmware/plugin generations produce confusing errors).
 
 ## 5. klipper-toolchanger + KAMP + r2pdx files
 

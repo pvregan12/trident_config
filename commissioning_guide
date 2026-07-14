@@ -80,8 +80,8 @@ during assembly than after).
 1. Home X, then Y. Verify homing direction and that position_endstop
    matches physical reality (nozzle at endstop = the coordinate in
    config). Fix position_max to measured travel.
-2. Cartographer: with XY homed, `CARTOGRAPHER_CALIBRATE` at bed
-   center per its docs (manual paper-Z first run), then `G28 Z`.
+2. Cartographer: with XY homed, scan calibration at bed
+   center per current Cartographer docs (then touch calibration), then `G28 Z`.
    Run `PROBE_ACCURACY`; expect single-digit-micron range.
 3. `Z_TILT_ADJUST` — should converge in 2-3 rounds. Re-`G28 Z`.
 4. `BED_MESH_CALIBRATE` — sanity-check the mesh shape (no cliffs).
@@ -91,7 +91,7 @@ during assembly than after).
    measure, correct.
 7. Input shaper with the T0 ADXL: `SHAPER_CALIBRATE`. Expect to
    revisit after MadMax (mass changes).
-8. First layer: `CARTOGRAPHER_TOUCH` z-offset workflow, test square,
+8. First layer: the touch z-offset workflow per Cartographer docs, test square,
    dial in.
 
 ## Phase 3 — First T0 print

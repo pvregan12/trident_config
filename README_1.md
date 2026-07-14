@@ -5,8 +5,8 @@ A resource and skeleton config set for an LDO 300 CUBE Trident with two identica
 ## Software stack
 
 1. **Klipper + Moonraker + Mainsail** — standard install (KIAUH is fine).
-2. **cartographer-klipper plugin** — `git clone https://github.com/Cartographer3D/cartographer-klipper && ./install.sh`. Adds the `[scanner]` section and `CARTOGRAPHER_*` commands.
-3. **viesturz/klipper-toolchanger** — the framework MadMax's sample configs target. `git clone https://github.com/viesturz/klipper-toolchanger && ./install.sh`. Adds `[toolchanger]`, `[tool ...]`, `[multi_fan]`, `[tool_probe]`, T0/T1 commands, and fan/heater remapping macros. Add both plugins to `moonraker.conf` update_manager so they stay current.
+2. **cartographer3d-plugin (NEW)** — installed into klippy-env via their install.sh one-liner (see INSTALL.md §4). Adds the `[cartographer]` section and probe commands; pairs with Survey 5.0+ firmware. (Supersedes the cartographer-klipper repo and its `[scanner]` section.)
+3. **viesturz/klipper-toolchanger** — the framework MadMax's sample configs target. `git clone https://github.com/viesturz/klipper-toolchanger && ./install.sh`. Adds `[toolchanger]`, `[tool ...]`, `[tool_probe]` sections. (Fan routing and T0/T1 commands come from r2pdx-derived toolchanger_macros.cfg in this package, not the plugin.) Add both plugins to `moonraker.conf` update_manager so they stay current.
 4. **MadMax repo `/Configs`** — copy the sample dropoff/pickup path params from there; they encode the actual keyslot geometry. Treat this package's coordinates as placeholders.
 5. **Nudge + r2pdx auto-offset calibration** (now included via `nudge.cfg`). `[tools_calibrate]` is part of klipper-toolchanger (no extra plugin). Download `offset_save_file.cfg` and `tc_offset_calibration_macros.cfg` from https://github.com/joseph-greiner/klipper_tc_automatic_offset_calibration into the config dir and uncomment their includes in `nudge.cfg`. Wire the Nudge to a spare MAIN-board endstop input (normally closed, no inversion) so it works regardless of attached tool. Consider 64x microsteps on X/Y for calibration resolution.
 
@@ -14,7 +14,7 @@ A resource and skeleton config set for an LDO 300 CUBE Trident with two identica
 
 ```
 printer.cfg          main MCU, kinematics, XY/Z steppers, bed, misc
-cartographer.cfg     scanner MCU, [scanner], [bed_mesh]
+cartographer.cfg     cartographer MCU, [cartographer], [bed_mesh]
 nudge.cfg            [tools_calibrate], Nudge wrapper macros,
                      hooks for r2pdx's auto-offset files
 toolchanger.cfg      [toolchanger], [tool T0], [tool T1], safety
@@ -42,9 +42,9 @@ macros.cfg           homing_override, PRINT_START/END, test cycle
 ## Commissioning sequence
 
 1. Flash Leviathan/Octopus, both Nitehawks, Cartographer. Verify all four MCUs connect.
-2. Single-tool bring-up first: run the printer as a normal Trident with T0 only. Verify endstops, stepper directions, PID both heaters, `CARTOGRAPHER_CALIBRATE`, then `CARTOGRAPHER_TOUCH`, z_tilt, bed mesh, input shaper (T0 ADXL).
+2. Single-tool bring-up first: run the printer as a normal Trident with T0 only. Verify endstops, stepper directions, PID both heaters, scan calibration, then touch calibration (per current Cartographer docs), z_tilt, bed mesh, input shaper (T0 ADXL).
 3. Install docks + T1. Measure dock park positions by jogging: seat the tool by hand, `GET_POSITION`, record.
-4. Tune dropoff/pickup paths at low speed with `params_path_speed` slow and hand on the E-stop. `TC_TEST_CYCLE COUNT=25` until zero faults.
+4. Tune dropoff/pickup paths at low speed with `params_path_speed` slow and hand on the E-stop. `DOCK_SEQUENCE REPS=100` until zero faults.
 5. Calibrate tool offsets: coarse manually (print a calibration cross with each tool), fine with Nudge + auto-offset macros. Offsets persist via `[save_variables]` / `gcode_x/y/z_offset`.
 6. Verify T1 input shaper matches T0 (identical heads should be close; confirm with the T1 ADXL).
 7. Slicer: PrusaSlicer/OrcaSlicer multi-extruder profile, 2 extruders, tool change G-code = just `T[next_extruder]`; pass both temps to `PRINT_START`.
