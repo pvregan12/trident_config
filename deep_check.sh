@@ -23,6 +23,7 @@
 
 set -euo pipefail
 CFG_SRC="${1:-./config}"
+CFG_SRC="$(realpath "$CFG_SRC")"
 GCODE_IN="${2:-}"
 CACHE="${HOME}/.cache/klipper-validate"
 KLIPPER="$CACHE/klipper"
@@ -72,14 +73,38 @@ SAVEFILE=$(find "$T" -name "offset_save_file.cfg" -o -name "variables.cfg" | hea
 [[ -z "$SAVEFILE" ]] && SAVEFILE="$T/offset_save_file.cfg"
 sed -i "s|^filename: .*|filename: $SAVEFILE|" "$T/printer.cfg"
 # stub missing include targets (installer/KAMP-provided)
-grep -hoE "^\[include [^]]+\]" "$T"/*.cfg "$T"/*/*.cfg 2>/dev/null \
-  | sed 's/\[include //; s/\]//' | sort -u | while read -r inc; do
-    if [[ ! -e "$T/$inc" ]]; then
-        mkdir -p "$T/$(dirname "$inc")"
-        printf '# auto-stub by deep_check.sh\n' > "$T/$inc"
-    fi
-done
-python3 - "$T/printer.cfg" <<'PYEOF'
+python3 - "$T" <<'PYSTUB'
+import sys, os, re
+
+root = sys.argv[1]
+seen = set()
+
+def walk(path):
+    if not os.path.exists(path) or path in seen:
+        return
+
+    seen.add(path)
+
+    for line in open(path, errors="replace"):
+        m = re.match(r"\s*\[include ([^]]+)\]", line)
+        if not m:
+            continue
+
+        inc = m.group(1)
+        target = os.path.join(os.path.dirname(path), inc)
+
+        if os.path.exists(target):
+            walk(target)
+        else:
+            os.makedirs(os.path.dirname(target), exist_ok=True)
+            open(target, "w").write(
+                "# auto-stub by deep_check.sh: missing include\n"
+            )
+            print(f"    (stubbed missing include: {inc})")
+
+walk(os.path.join(root, "printer.cfg"))
+PYSTUB
+"$PY" - "$T/printer.cfg" <<'PYEOF'
 import sys
 p = sys.argv[1]; s = open(p).read()
 s = s.replace("[include cartographer.cfg]",

@@ -23,6 +23,7 @@ for arg in "$@"; do case "$arg" in
     *)        CFG_SRC="$arg";;
 esac; done
 CFG_SRC="${CFG_SRC:-./config}"
+CFG_SRC="$(realpath "$CFG_SRC")"
 
 [[ -d "$CFG_SRC" ]] || { echo "ERROR: config dir '$CFG_SRC' not found"; exit 2; }
 [[ -f "$CFG_SRC/printer.cfg" ]] || {
@@ -59,11 +60,6 @@ validate () {  # $1 = label, $2 = prep-function to mutate configs (or "")
     local label="$1" prep="${2:-}"
     local T; T=$(mktemp -d)
     trap 'rm -rf "$T"' RETURN
-    echo "DEBUG:"
-    echo "  pwd=$(pwd)"
-    echo "  CFG_SRC=$CFG_SRC"
-    echo "  ls:"
-    ls -ld "$CFG_SRC"
     cp -r "$CFG_SRC"/. "$T"/
     mkdir -p "$T/gcodes"
     # duplicate-macro guard: Klipper merges duplicate sections
