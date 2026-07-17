@@ -29,7 +29,7 @@ KLIPPER="$CACHE/klipper"
 PY="$CACHE/venv/bin/python3"
 
 [[ -x "$PY" ]] || { echo "ERROR: run check.sh once first (builds the cached toolchain)"; exit 2; }
-compgen -G "$CFG_SRC/*.cfg" >/dev/null || { echo "ERROR: no .cfg files in '$CFG_SRC'"; exit 2; }
+[[ -f "$CFG_SRC/printer.cfg" ]] || { echo "ERROR: no printer.cfg at top level of '$CFG_SRC'"; exit 2; }
 
 # ---------- MCU dictionaries (cached, one-time compile) ----------
 build_dict () {  # $1 = name, $2 = kconfig lines
@@ -49,7 +49,7 @@ build_dict rp2040    "CONFIG_MACH_RPXXXX=y\nCONFIG_MACH_RP2040=y"
 
 # ---------- batch-mode config variant ----------
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
-cp "$CFG_SRC"/*.cfg "$T"/ && mkdir -p "$T/gcodes"
+cp -r "$CFG_SRC"/. "$T"/ && mkdir -p "$T/gcodes"
 [[ -f "$T/mainsail.cfg" ]] || cat > "$T/mainsail.cfg" <<'EOF'
 [virtual_sdcard]
 path: gcodes
@@ -68,12 +68,22 @@ rename_existing: BASE_CANCEL_PRINT
 gcode:
     BASE_CANCEL_PRINT
 EOF
-sed -i "s|filename: .*offset_save_file.cfg|filename: $T/offset_save_file.cfg|" "$T/printer.cfg"
+SAVEFILE=$(find "$T" -name "offset_save_file.cfg" -o -name "variables.cfg" | head -1)
+[[ -z "$SAVEFILE" ]] && SAVEFILE="$T/offset_save_file.cfg"
+sed -i "s|^filename: .*|filename: $SAVEFILE|" "$T/printer.cfg"
+# stub missing include targets (installer/KAMP-provided)
+grep -hoE "^\[include [^]]+\]" "$T"/*.cfg "$T"/*/*.cfg 2>/dev/null \
+  | sed 's/\[include //; s/\]//' | sort -u | while read -r inc; do
+    if [[ ! -e "$T/$inc" ]]; then
+        mkdir -p "$T/$(dirname "$inc")"
+        printf '# auto-stub by deep_check.sh\n' > "$T/$inc"
+    fi
+done
 python3 - "$T/printer.cfg" <<'PYEOF'
 import sys
 p = sys.argv[1]; s = open(p).read()
 s = s.replace("[include cartographer.cfg]",
-"""#[include cartographer.cfg]   ; BATCH: no cartographer dict available
+"""#[include cartographer.cfg]   ; BATCH: cartographer stubbed (vendor fw, no dict)
 [bed_mesh]
 speed: 200
 horizontal_move_z: 5
