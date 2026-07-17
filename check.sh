@@ -59,6 +59,11 @@ validate () {  # $1 = label, $2 = prep-function to mutate configs (or "")
     local label="$1" prep="${2:-}"
     local T; T=$(mktemp -d)
     trap 'rm -rf "$T"' RETURN
+    echo "DEBUG:"
+    echo "  pwd=$(pwd)"
+    echo "  CFG_SRC=$CFG_SRC"
+    echo "  ls:"
+    ls -ld "$CFG_SRC"
     cp -r "$CFG_SRC"/. "$T"/
     mkdir -p "$T/gcodes"
     # duplicate-macro guard: Klipper merges duplicate sections
